@@ -1,25 +1,139 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Reproducible research - Assignment week 2"
+author: "Amelie"
+date: "23 aout 2017"
+output: html_document
 ---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
 ## Loading and preprocessing the data
-
-
+Download the data from the internet
+```{r Download data}
+url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+download.file(url, destfile = "activity.zip")
+unzip("activity.zip")
+```
+Preprocess the data
+```{r Preprocess the data}
+activity <- read.csv("activity.csv")
+activity$Date <- as.Date(activity$date, format="%Y-%m-%d")
+activity$Date <- as.POSIXct(activity$Date)
+```
 
 ## What is mean total number of steps taken per day?
+```{r Load librairies, results="hide"}
+library("dplyr")
+library("lubridate")
+```
+Calculate the total number of steps taken a day
+```{r Steps per day - Sum}
+sum_steps_day <- activity %>% 
+  group_by(year = year(Date), month = month(Date), day = day(Date)) %>% 
+  summarise(sum = sum(steps))
+```
+Create the histogram
+```{r Steps per day - Histogram}
+ hist(sum_steps_day$sum, main = "Number of steps taken per day", xlab = "Steps")
+```  
 
-
+Calculate the mean total number of steps taken a day
+```{r Steps per day - Mean}
+mean_tot_steps_day <- mean(sum_steps_day$sum, na.rm = TRUE)
+mean_tot_steps_day
+```  
+```{r Steps per day - Median}
+median_tot_steps_day <- median(sum_steps_day$sum, na.rm = TRUE)
+median_tot_steps_day
+```  
 
 ## What is the average daily activity pattern?
+Average number of steps taken for all days per 5-minute interval
+```{r Steps per interval - Mean}
+sum_steps_int <- activity %>% 
+  group_by(interval = interval) %>% 
+  summarise(mean = mean(steps, na.rm=TRUE))
+```
+Create the plot
+```{r Steps per interval - Plot}
+plot(sum_steps_int$interval, sum_steps_int$mean, type="l", ylab = "Mean", xlab = "Interval", main = "Average number of steps taken for all days per 5-minute interval")
+```  
 
-
-
+Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+```{r Steps per interval - Max interval}
+sum_steps_int[sum_steps_int$mean==max(sum_steps_int$mean),1]
+```
 ## Imputing missing values
+Calculate the total number of missing values in the dataset
+```{r NA - Sum}
+sum(is.na(activity$steps))
+```
+Filling missing values in a new dataset
+```{r NA - Filling}
+activity_noNA <- read.csv("activity.csv")
+activity_noNA$Date <- as.Date(activity_noNA$date, format="%Y-%m-%d")
+activity_noNA$Date <- as.POSIXct(activity_noNA$Date)
+for(i in 1:nrow(activity_noNA)){
+if(is.na(activity_noNA[i,1])){
+    int <- activity_noNA[i,3]
+    fill <- sum_steps_int[sum_steps_int$interval==int,2]
+    activity_noNA[i,1] = fill}}
+```
+Calculate the total number of steps taken a day including imputed values
+```{r Steps per day - Sum without NA}
+sum_steps_day_noNA <- activity_noNA %>% 
+  group_by(year = year(Date), month = month(Date), day = day(Date)) %>% 
+  summarise(sum = sum(steps))
+```
+Create the histogram including imputed values
+```{r Steps per day - Histogram without NA}
+ hist(sum_steps_day_noNA$sum, main = "Number of steps taken per day", xlab = "Steps")
+```  
 
-
-
+Mean of steps taken per day including imputed values
+```{r Steps per day - Mean without NA}
+mean_tot_steps_day_noNA <- mean(sum_steps_day_noNA$sum)
+mean_tot_steps_day_noNA
+```  
+Median of steps taken per day including imputed values
+```{r Steps per day - Median without NA}
+median_tot_steps_day_noNA <- median(sum_steps_day_noNA$sum)
+median_tot_steps_day_noNA
+```  
+What is the impact of imputing missing data?
+On the mean: the difference of *data with na* - *data without na* is:
+```{r NA - Mean difference}
+mean_tot_steps_day-mean_tot_steps_day_noNA
+```
+On the media: the difference of *data with na* - *data without na* is:
+```{r NA - Median difference}
+median_tot_steps_day-median_tot_steps_day_noNA
+```
 ## Are there differences in activity patterns between weekdays and weekends?
+Add the factor variable
+```{r Patterns - Factors}
+Sys.setlocale("LC_TIME", "English")
+weekend_list <- c('Saturday', 'Sunday')
+activity_noNA$wd_we <- factor((weekdays(activity_noNA$Date) %in% weekend_list), 
+         levels=c(TRUE, FALSE), labels=c('weekend', 'weekday')) 
+```
+
+```{r Steps per interval and wdwe- Mean}
+sum_steps_int_wdwe <- activity_noNA %>% 
+  group_by(interval = interval, wdwe=wd_we) %>% 
+  summarise(mean = mean(steps))
+```
+Create the plot
+```{r Patterns - Plot}
+library("ggplot2")
+qplot(interval,mean, 
+      data = sum_steps_int_wdwe,
+      facets = .~wdwe, 
+      geom = "line",
+      main = "Average number of steps taken",
+      xlab = "Interval", 
+      ylab = "Steps")
+```
+
